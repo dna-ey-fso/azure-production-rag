@@ -1,9 +1,9 @@
 import { ChangeEvent, useEffect, useState, useRef } from "react";
 import { useMsal } from "@azure/msal-react";
 import { IStyleFunctionOrObject, Stack, TextField } from "@fluentui/react";
-import { Button, Tooltip, Spinner } from "@fluentui/react-components";
+import { Button, Tooltip, Spinner, ToggleButton } from "@fluentui/react-components";
 import { Toggle } from "@fluentui/react/lib/Toggle";
-import { Send24Filled, ArrowUpload24Filled, ArrowClockwise24Regular, ArrowClockwise24Filled } from "@fluentui/react-icons";
+import { Send24Filled, ArrowUpload24Filled, ArrowClockwise24Regular, ArrowClockwise24Filled, Filter24Filled } from "@fluentui/react-icons";
 import { isLoggedIn, requireAccessControl } from "../../authConfig";
 
 import styles from "./QuestionInput.module.css";
@@ -97,46 +97,45 @@ export const QuestionInput = ({ onSend, setDocFilter, disabled, placeholder, cle
     }
 
     return (
-        <Stack horizontal className={styles.inputUpload}>
-            <Stack horizontal className={styles.questionInputContainer}>
-                <TextField
-                    className={styles.questionInputTextArea}
-                    disabled={disableRequiredAccessControl}
-                    placeholder={placeholder}
-                    multiline
-                    resizable={false}
-                    borderless
-                    value={question}
-                    onChange={onQuestionChange}
-                    onKeyDown={onEnterPress}
-                />
-                <div className={styles.questionInputButtonsContainer}>
-                    <Tooltip content="Ask question button" relationship="label">
-                        <Button
-                            size="large"
-                            icon={<Send24Filled primaryFill="rgba(115, 118, 225, 1)" />}
-                            disabled={sendQuestionDisabled}
-                            onClick={sendQuestion}
-                        />
-                    </Tooltip>
-                </div>
-            </Stack>
-            <div className={styles.uploadButtonContainer}>
-                {/* <UploadFiles setUploadedFiles={setUploadedFiles} /> */}
-                {!uploadedFiles && <UploadFiles setUploadedFiles={setUploadedFiles} />}
-                {uploadedFiles && (
-                    <div>
-                        {/* <Toggle checked={isOn} styles={toggleStyles} onChange={() => setIsOn(!isOn)} label="Filter" /> */}
-                        <Tooltip content="Remove all files" relationship="label">
+        <Stack className={styles.inputContainer}>
+            {uploadedFiles && <p>Only retrieving information from: {uploadedFiles[0].name}</p>}
+            <Stack horizontal className={styles.inputUpload}>
+                <Stack horizontal className={styles.questionInputContainer}>
+                    <TextField
+                        className={styles.questionInputTextArea}
+                        disabled={disableRequiredAccessControl}
+                        placeholder={placeholder}
+                        multiline
+                        resizable={false}
+                        borderless
+                        value={question}
+                        onChange={onQuestionChange}
+                        onKeyDown={onEnterPress}
+                    />
+                    <div className={styles.questionInputButtonsContainer}>
+                        <Tooltip content="Ask question button" relationship="label">
                             <Button
                                 size="large"
-                                icon={<ArrowClockwise24Filled primaryFill="rgba(115, 118, 225, 1)" />}
-                                onClick={() => setUploadedFiles(null)}
+                                icon={<Send24Filled primaryFill="rgba(115, 118, 225, 1)" />}
+                                disabled={sendQuestionDisabled}
+                                onClick={sendQuestion}
                             />
                         </Tooltip>
                     </div>
-                )}
-            </div>
+                </Stack>
+                <div className={styles.uploadButtonContainer}>
+                    {/* <UploadFiles setUploadedFiles={setUploadedFiles} /> */}
+                    {!uploadedFiles && <UploadFiles setUploadedFiles={setUploadedFiles} />}
+                    {uploadedFiles && (
+                        <div>
+                            {/* <Toggle checked={isOn} styles={toggleStyles} onChange={() => setIsOn(!isOn)} label="Filter" /> */}
+                            <Tooltip content="Filter is applied. Press to start chatting with all documents again." relationship="label">
+                                <Button size="large" icon={<Filter24Filled primaryFill="rgba(115, 118, 225, 1)" />} onClick={() => setUploadedFiles(null)} />
+                            </Tooltip>
+                        </div>
+                    )}
+                </div>
+            </Stack>
         </Stack>
     );
 };

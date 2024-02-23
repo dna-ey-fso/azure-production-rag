@@ -86,7 +86,7 @@ export const Answer = ({
     };
 
     const handleContactClick = () => {
-        const email = "jiri.de.jonghe@be.ey.com";
+        const email = "jiri.de.jonghe@be.ey.com;sofyan.ajridi@be.ey.com";
         const emailTemplate = `Dear [Recipient's Name]\n\nI hope you are doing well. We're contacting you regarding the question you asked: \n\n${question}\n\n${removeCitationsAnswer}\n\nThank you for your time.\n\nKind Regards,\n[Your Name]\n[Your Position]\n[Your Company]\n[Your Contact Information]`;
         window.open(`mailto:${email}?subject=${encodeURIComponent("Question Follow-up") || ""}&body=${encodeURIComponent(emailTemplate) || ""}`);
     };
@@ -124,8 +124,8 @@ export const Answer = ({
                         <IconButton
                             style={{ color: "black" }}
                             iconProps={{ iconName: "mail" }}
-                            title="Show Evaluation"
-                            ariaLabel="Show Evaluation"
+                            title="Send Email"
+                            ariaLabel="Send Email"
                             onClick={() => handleContactClick()}
                             disabled={!answer.choices[0].context.data_points}
                         />
