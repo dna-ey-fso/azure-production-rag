@@ -16,12 +16,11 @@ interface Props {
     context: string;
     relevance: number;
     coherence: number;
-    similarity: number;
     groundedness: number;
     removeActiveSample: () => void;
 }
 
-const EvalItemDetailed = ({ question, answer, context, relevance, coherence, similarity, groundedness, removeActiveSample }: Props) => {
+const EvalItemDetailed = ({ question, answer, context, relevance, coherence, groundedness, removeActiveSample }: Props) => {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [activeCitation, setActiveCitation] = useState<string>("");
     const [citation, setCitation] = useState("");
@@ -83,10 +82,6 @@ const EvalItemDetailed = ({ question, answer, context, relevance, coherence, sim
                     <div className={styles.metricGridElem}>
                         <span>Coherence</span>
                         {coherence}
-                    </div>
-                    <div className={styles.metricGridElem}>
-                        <span>Similarity</span>
-                        {similarity}
                     </div>
                 </div>
                 <div className={styles.evalItemDetailedTextContainer}>

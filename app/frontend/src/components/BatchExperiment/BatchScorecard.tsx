@@ -5,12 +5,12 @@ interface Props {
     summ: any;
 }
 const BatchScorecard = ({ experimentName, summ }: Props) => {
-    const gpt_groundedness = summ.gpt_groundedness.mean_rating;
-    const gpt_relevance = summ.gpt_relevance.mean_rating;
-    const gpt_coherence = summ.gpt_coherence.mean_rating;
-    const gpt_similarity = summ.gpt_similarity.mean_rating;
+    const groundedness = summ.groundedness.mean_rating;
+    const relevance = summ.relevance.mean_rating;
+    const coherence = summ.coherence.mean_rating;
+    const latency = summ.latency.mean;
     const answer_length = summ.answer_length.mean;
-    const answer_has_citation = summ.answer_has_citation.rate;
+    // const answer_has_citation = summ.answer_has_citation.rate;
 
     return (
         <div className={styles.batchScorecard}>
@@ -20,28 +20,28 @@ const BatchScorecard = ({ experimentName, summ }: Props) => {
             <div className={styles.batchScorecardContent}>
                 <div className={styles.metricGridElem}>
                     <span>Groundedness</span>
-                    {gpt_groundedness}
+                    {groundedness}
                 </div>
                 <div className={styles.metricGridElem}>
                     <span>Relevance</span>
-                    {gpt_relevance}
+                    {relevance}
                 </div>
                 <div className={styles.metricGridElem}>
                     <span>Coherence</span>
-                    {gpt_coherence}
+                    {coherence}
                 </div>
                 <div className={styles.metricGridElem}>
                     <span>Similarity</span>
-                    {gpt_similarity}
+                    {latency}
                 </div>
                 <div className={styles.metricGridElem}>
                     <span>Answer Length</span>
                     {answer_length}
                 </div>
-                <div className={styles.metricGridElem}>
+                {/* <div className={styles.metricGridElem}>
                     <span>Citation Rate</span>
                     {answer_has_citation}
-                </div>
+                </div> */}
             </div>
         </div>
     );

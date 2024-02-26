@@ -2,17 +2,15 @@ import styles from "./EvalItem.module.css";
 
 interface Props {
     question: string;
-    answer: string;
     relevance: number;
     coherence: number;
-    similarity: number;
     groundedness: number;
     setActiveSample: (str: string) => void;
 }
 
-const EvalItem = ({ question, answer, relevance, coherence, similarity, groundedness, setActiveSample }: Props) => {
+const EvalItem = ({ question, relevance, coherence, groundedness, setActiveSample }: Props) => {
     const alert = () => {
-        const isAnyValueBelowThree = groundedness < 3 || relevance < 3 || coherence < 3 || similarity < 3;
+        const isAnyValueBelowThree = groundedness < 3 || relevance < 3 || coherence < 3;
         return isAnyValueBelowThree;
     };
 
@@ -35,10 +33,6 @@ const EvalItem = ({ question, answer, relevance, coherence, similarity, grounded
                     <div className={styles.metricGridElem}>
                         <span>Coherence</span>
                         {coherence}
-                    </div>
-                    <div className={styles.metricGridElem}>
-                        <span>Similarity</span>
-                        {similarity}
                     </div>
                 </div>
             </div>
