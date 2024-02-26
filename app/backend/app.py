@@ -108,10 +108,11 @@ async def content_file(path: str):
     This is also slow and memory hungry.
     """
     # Remove page number from path, filename-1.txt -> filename.txt
+    # This shouldn't typically be necessary as browsers don't send hash fragments to servers
     if path.find("#page=") > 0:
         path_parts = path.rsplit("#page=", 1)
         path = path_parts[0]
-    logging.info("Opening file %s at page %s", path)
+    logging.info("Opening file %s", path)
     blob_container_client = current_app.config[CONFIG_BLOB_CONTAINER_CLIENT]
     try:
         blob = await blob_container_client.get_blob_client(path).download_blob()
@@ -405,7 +406,6 @@ async def setup_clients():
     AZURE_SEARCH_SERVICE = os.environ["AZURE_SEARCH_SERVICE"]
     AZURE_SEARCH_INDEX = os.environ["AZURE_SEARCH_INDEX"]
     SEARCH_SECRET_NAME = os.getenv("SEARCH_SECRET_NAME")
-    VISION_SECRET_NAME = os.getenv("VISION_SECRET_NAME")
     AZURE_KEY_VAULT_NAME = os.getenv("AZURE_KEY_VAULT_NAME")
     # Shared by all OpenAI deployments
     OPENAI_HOST = os.getenv("OPENAI_HOST", "azure")
@@ -415,8 +415,10 @@ async def setup_clients():
     AZURE_OPENAI_SERVICE = os.getenv("AZURE_OPENAI_SERVICE")
     AZURE_OPENAI_GPT4V_DEPLOYMENT = os.environ.get("AZURE_OPENAI_GPT4V_DEPLOYMENT")
     AZURE_OPENAI_GPT4V_MODEL = os.environ.get("AZURE_OPENAI_GPT4V_MODEL")
-    AZURE_OPENAI_CHATGPT_DEPLOYMENT = os.getenv("AZURE_OPENAI_CHATGPT_DEPLOYMENT") if OPENAI_HOST == "azure" else None
-    AZURE_OPENAI_EMB_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMB_DEPLOYMENT") if OPENAI_HOST == "azure" else None
+    AZURE_OPENAI_CHATGPT_DEPLOYMENT = (
+        os.getenv("AZURE_OPENAI_CHATGPT_DEPLOYMENT") if OPENAI_HOST.startswith("azure") else None
+    )
+    AZURE_OPENAI_EMB_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMB_DEPLOYMENT") if OPENAI_HOST.startswith("azure") else None
     AZURE_VISION_ENDPOINT = os.getenv("AZURE_VISION_ENDPOINT", "")
     # Used only with non-Azure OpenAI deployments
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -446,13 +448,11 @@ async def setup_clients():
     azure_credential = DefaultAzureCredential(exclude_shared_token_cache_credential=True)
 
     # Fetch any necessary secrets from Key Vault
-    vision_key = None
     search_key = None
-    if AZURE_KEY_VAULT_NAME and (VISION_SECRET_NAME or SEARCH_SECRET_NAME):
+    if AZURE_KEY_VAULT_NAME:
         key_vault_client = SecretClient(
             vault_url=f"https://{AZURE_KEY_VAULT_NAME}.vault.azure.net", credential=azure_credential
         )
-        vision_key = VISION_SECRET_NAME and (await key_vault_client.get_secret(VISION_SECRET_NAME)).value
         search_key = SEARCH_SECRET_NAME and (await key_vault_client.get_secret(SEARCH_SECRET_NAME)).value
         await key_vault_client.close()
 
@@ -496,12 +496,18 @@ async def setup_clients():
     # Used by the OpenAI SDK
     openai_client: AsyncOpenAI
 
-    if OPENAI_HOST == "azure":
+    if OPENAI_HOST.startswith("azure"):
         token_provider = get_bearer_token_provider(azure_credential, "https://cognitiveservices.azure.com/.default")
+
+        if OPENAI_HOST == "azure_custom":
+            endpoint = os.environ["AZURE_OPENAI_CUSTOM_URL"]
+        else:
+            endpoint = f"https://{AZURE_OPENAI_SERVICE}.openai.azure.com"
+
         # Store on app.config for later use inside requests
         openai_client = AsyncAzureOpenAI(
             api_version="2023-07-01-preview",
-            azure_endpoint=f"https://{AZURE_OPENAI_SERVICE}.openai.azure.com",
+            azure_endpoint=endpoint,
             azure_ad_token_provider=token_provider,
         )
     elif OPENAI_HOST == "local":
@@ -540,8 +546,8 @@ async def setup_clients():
     )
 
     if USE_GPT4V:
-        if vision_key is None:
-            raise ValueError("Vision key must be set (in Key Vault) to use the vision approach.")
+
+        token_provider = get_bearer_token_provider(azure_credential, "https://cognitiveservices.azure.com/.default")
 
         current_app.config[CONFIG_ASK_VISION_APPROACH] = RetrieveThenReadVisionApproach(
             search_client=search_client,
@@ -549,7 +555,7 @@ async def setup_clients():
             blob_container_client=blob_container_client,
             auth_helper=auth_helper,
             vision_endpoint=AZURE_VISION_ENDPOINT,
-            vision_key=vision_key,
+            vision_token_provider=token_provider,
             gpt4v_deployment=AZURE_OPENAI_GPT4V_DEPLOYMENT,
             gpt4v_model=AZURE_OPENAI_GPT4V_MODEL,
             embedding_model=OPENAI_EMB_MODEL,
@@ -566,7 +572,7 @@ async def setup_clients():
             blob_container_client=blob_container_client,
             auth_helper=auth_helper,
             vision_endpoint=AZURE_VISION_ENDPOINT,
-            vision_key=vision_key,
+            vision_token_provider=token_provider,
             gpt4v_deployment=AZURE_OPENAI_GPT4V_DEPLOYMENT,
             gpt4v_model=AZURE_OPENAI_GPT4V_MODEL,
             embedding_model=OPENAI_EMB_MODEL,

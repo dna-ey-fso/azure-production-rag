@@ -4,7 +4,7 @@ from typing import Any, Optional, Union
 
 from azure.core.credentials import AzureKeyCredential
 from azure.core.credentials_async import AsyncTokenCredential
-from azure.identity.aio import AzureDeveloperCliCredential
+from azure.identity.aio import AzureDeveloperCliCredential, get_bearer_token_provider
 from azure.keyvault.secrets.aio import SecretClient
 
 from prepdocslib.blobmanager import BlobManager
@@ -35,19 +35,6 @@ def is_key_empty(key):
     return key is None or len(key.strip()) == 0
 
 
-async def get_vision_key(credential: AsyncTokenCredential) -> Optional[str]:
-    if args.visionkey:
-        return args.visionkey
-
-    if args.keyvaultname and args.visionsecretname:
-        key_vault_client = SecretClient(vault_url=f"https://{args.keyvaultname}.vault.azure.net", credential=credential)
-        visionkey = await key_vault_client.get_secret(args.visionsecretname)
-        return visionkey.value
-    else:
-        print("Error: Please provide --visionkey or --keyvaultname and --visionsecretname when using --searchimages.")
-        exit(1)
-
-
 async def setup_file_strategy(credential: AsyncTokenCredential, args: Any) -> Strategy:
     storage_creds = credential if is_key_empty(args.storagekey) else args.storagekey
     blob_manager = BlobManager(
@@ -65,16 +52,18 @@ async def setup_file_strategy(credential: AsyncTokenCredential, args: Any) -> St
     doc_int_parser: DocumentAnalysisParser
 
     # check if Azure Document Intelligence credentials are provided
-    if args.formrecognizerservice is not None:
-        formrecognizer_creds: Union[AsyncTokenCredential, AzureKeyCredential] = (
-            credential if is_key_empty(args.formrecognizerkey) else AzureKeyCredential(args.formrecognizerkey)
+    if args.documentintelligenceservice is not None:
+        documentintelligence_creds: Union[AsyncTokenCredential, AzureKeyCredential] = (
+            credential
+            if is_key_empty(args.documentintelligencekey)
+            else AzureKeyCredential(args.documentintelligencekey)
         )
         doc_int_parser = DocumentAnalysisParser(
-            endpoint=f"https://{args.formrecognizerservice}.cognitiveservices.azure.com/",
-            credential=formrecognizer_creds,
+            endpoint=f"https://{args.documentintelligenceservice}.cognitiveservices.azure.com/",
+            credential=documentintelligence_creds,
             verbose=args.verbose,
         )
-    if args.localpdfparser or args.formrecognizerservice is None:
+    if args.localpdfparser or args.documentintelligenceservice is None:
         pdf_parser = LocalPdfParser()
     else:
         pdf_parser = doc_int_parser
@@ -83,6 +72,14 @@ async def setup_file_strategy(credential: AsyncTokenCredential, args: Any) -> St
         ".pdf": FileProcessor(pdf_parser, sentence_text_splitter),
         ".json": FileProcessor(JsonParser(), SimpleTextSplitter()),
         ".docx": FileProcessor(doc_int_parser, sentence_text_splitter),
+        ".pptx": FileProcessor(doc_int_parser, sentence_text_splitter),
+        ".xlsx": FileProcessor(doc_int_parser, sentence_text_splitter),
+        ".png": FileProcessor(doc_int_parser, sentence_text_splitter),
+        ".jpg": FileProcessor(doc_int_parser, sentence_text_splitter),
+        ".jpeg": FileProcessor(doc_int_parser, sentence_text_splitter),
+        ".tiff": FileProcessor(doc_int_parser, sentence_text_splitter),
+        ".bmp": FileProcessor(doc_int_parser, sentence_text_splitter),
+        ".heic": FileProcessor(doc_int_parser, sentence_text_splitter),
     }
     use_vectors = not args.novectors
     embeddings: Optional[OpenAIEmbeddings] = None
@@ -110,9 +107,10 @@ async def setup_file_strategy(credential: AsyncTokenCredential, args: Any) -> St
     image_embeddings: Optional[ImageEmbeddings] = None
 
     if args.searchimages:
-        key = await get_vision_key(credential)
-        image_embeddings = (
-            ImageEmbeddings(credential=key, endpoint=args.visionendpoint, verbose=args.verbose) if key else None
+        image_embeddings = ImageEmbeddings(
+            endpoint=args.visionendpoint,
+            token_provider=get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default"),
+            verbose=args.verbose,
         )
 
     print("Processing files...")
@@ -355,12 +353,12 @@ if __name__ == "__main__":
         help="Use PyPdf local PDF parser (supports only digital PDFs) instead of Azure Document Intelligence service to extract text, tables and layout from the documents",
     )
     parser.add_argument(
-        "--formrecognizerservice",
+        "--documentintelligenceservice",
         required=False,
         help="Optional. Name of the Azure Document Intelligence service which will be used to extract text, tables and layout from the documents (must exist already)",
     )
     parser.add_argument(
-        "--formrecognizerkey",
+        "--documentintelligencekey",
         required=False,
         help="Optional. Use this Azure Document Intelligence account key instead of the current user identity to login (use az login to set current user for Azure)",
     )
@@ -406,7 +404,8 @@ if __name__ == "__main__":
         else AzureDeveloperCliCredential(tenant_id=args.tenantid, process_timeout=60)
     )
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     ingestion_strategy = None
     if use_int_vectorization:
         ingestion_strategy = loop.run_until_complete(setup_intvectorizer_strategy(azd_credential, args))

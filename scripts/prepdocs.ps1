@@ -13,11 +13,11 @@ if ($env:AZURE_ADLS_GEN2_STORAGE_ACCOUNT) {
   $adlsGen2StorageAccountArg = "--datalakestorageaccount $env:AZURE_ADLS_GEN2_STORAGE_ACCOUNT"
   $adlsGen2FilesystemPathArg = ""
   if ($env:AZURE_ADLS_GEN2_FILESYSTEM_PATH) {
-    $adlsGen2FilesystemPathArg = "--datalakefilesystempath $env:ADLS_GEN2_FILESYSTEM_PATH"
+    $adlsGen2FilesystemPathArg = "--datalakefilesystempath $env:AZURE_ADLS_GEN2_FILESYSTEM_PATH"
   }
   $adlsGen2FilesystemArg = ""
   if ($env:AZURE_ADLS_GEN2_FILESYSTEM) {
-    $adlsGen2FilesystemArg = "--datalakefilesystem $env:ADLS_GEN2_FILESYSTEM"
+    $adlsGen2FilesystemArg = "--datalakefilesystem $env:AZURE_ADLS_GEN2_FILESYSTEM"
   }
 }
 if ($env:AZURE_USE_AUTHENTICATION) {
@@ -76,7 +76,7 @@ $argumentList = "./scripts/prepdocs.py $dataArg --verbose " + `
 "--openaihost `"$env:OPENAI_HOST`" --openaimodelname `"$env:AZURE_OPENAI_EMB_MODEL_NAME`" " + `
 "--openaiservice `"$env:AZURE_OPENAI_SERVICE`" --openaideployment `"$env:AZURE_OPENAI_EMB_DEPLOYMENT`" " + `
 "--openaikey `"$env:OPENAI_API_KEY`" --openaiorg `"$env:OPENAI_ORGANIZATION`" " + `
-"--formrecognizerservice $env:AZURE_FORMRECOGNIZER_SERVICE " + `
+"--documentintelligenceservice $env:AZURE_DOCUMENTINTELLIGENCE_SERVICE " + `
 "$searchImagesArg $visionEndpointArg $visionKeyArg $visionSecretNameArg " + `
 "$adlsGen2StorageAccountArg $adlsGen2FilesystemArg $adlsGen2FilesystemPathArg  " + `
 "$tenantArg $aclArg " + `
