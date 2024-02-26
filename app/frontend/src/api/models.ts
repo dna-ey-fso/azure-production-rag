@@ -125,3 +125,12 @@ export type IUploadResponse = {
     success: boolean;
     message?: string;
 };
+
+export type IRemoveRequest = {
+    filenames: string[];
+};
+
+export type IRemoveResponse = {
+    success: boolean;
+    message?: string;
+};

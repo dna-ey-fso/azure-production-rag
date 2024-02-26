@@ -62,8 +62,6 @@ const UploadFiles = ({ setUploadedFiles }: Props) => {
             formData.append(`file${index}`, file);
         });
 
-        console.log("Before mutation: ", mutation);
-
         try {
             const response: IUploadResponse = await mutation.mutateAsync(formData);
             setUploadedFiles(selectedFiles);

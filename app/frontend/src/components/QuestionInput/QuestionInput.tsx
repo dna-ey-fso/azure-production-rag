@@ -3,11 +3,13 @@ import { useMsal } from "@azure/msal-react";
 import { IStyleFunctionOrObject, Stack, TextField } from "@fluentui/react";
 import { Button, Tooltip, Spinner, ToggleButton } from "@fluentui/react-components";
 import { Toggle } from "@fluentui/react/lib/Toggle";
-import { Send24Filled, ArrowUpload24Filled, ArrowClockwise24Regular, ArrowClockwise24Filled, Filter24Filled } from "@fluentui/react-icons";
+import { Send24Filled, Dismiss24Filled, Filter24Filled, FilterDismiss24Filled } from "@fluentui/react-icons";
 import { isLoggedIn, requireAccessControl } from "../../authConfig";
 
 import styles from "./QuestionInput.module.css";
 import UploadFiles from "../UploadFiles/UploadFiles";
+import { useMutation } from "react-query";
+import { IRemoveRequest, IRemoveResponse, removeFilesApi } from "../../api";
 
 interface Props {
     onSend: (question: string) => void;
@@ -23,6 +25,16 @@ export const QuestionInput = ({ onSend, setDocFilter, disabled, placeholder, cle
 
     const [isOn, setIsOn] = useState<boolean>(true);
     const [uploadedFiles, setUploadedFiles] = useState<File[] | null>(null);
+
+    const mutation = useMutation<any, Error, { files: string[]; idToken?: string }>(({ files }) => removeFilesApi(files, undefined), {
+        onSettled: (data, error) => {
+            if (error) {
+                console.log("Deletion failed:", error);
+            } else {
+                console.log("Deletion Successful");
+            }
+        }
+    });
 
     useEffect(() => {
         initQuestion && setQuestion(initQuestion);
@@ -79,14 +91,18 @@ export const QuestionInput = ({ onSend, setDocFilter, disabled, placeholder, cle
         }
     };
 
-    // const toggleStyles: IStyleFunctionOrObject<any, any> = {
-    //     pillUncheckedBackground: {
-    //         backgroundColor: "white"
-    //     },
-    //     pillCheckedBackground: {
-    //         backgroundColor: "black"
-    //     }
-    // };
+    const removeFiles = async () => {
+        const response: IRemoveResponse = await mutation.mutateAsync({
+            files: uploadedFiles?.map(file => file.name) as string[]
+        });
+        setUploadedFiles(null);
+        setDocFilter(undefined);
+    };
+
+    const removeFilter = () => {
+        setDocFilter(undefined);
+        setIsOn(!isOn);
+    };
 
     const { instance } = useMsal();
     const disableRequiredAccessControl = requireAccessControl && !isLoggedIn(instance);
@@ -98,7 +114,7 @@ export const QuestionInput = ({ onSend, setDocFilter, disabled, placeholder, cle
 
     return (
         <Stack className={styles.inputContainer}>
-            {uploadedFiles && <p>Only retrieving information from: {uploadedFiles[0].name}</p>}
+            {isOn && uploadedFiles && <p>Only retrieving information from: {uploadedFiles[0].name}</p>}
             <Stack horizontal className={styles.inputUpload}>
                 <Stack horizontal className={styles.questionInputContainer}>
                     <TextField
@@ -128,9 +144,17 @@ export const QuestionInput = ({ onSend, setDocFilter, disabled, placeholder, cle
                     {!uploadedFiles && <UploadFiles setUploadedFiles={setUploadedFiles} />}
                     {uploadedFiles && (
                         <div>
-                            {/* <Toggle checked={isOn} styles={toggleStyles} onChange={() => setIsOn(!isOn)} label="Filter" /> */}
-                            <Tooltip content="Filter is applied. Press to start chatting with all documents again." relationship="label">
-                                <Button size="large" icon={<Filter24Filled primaryFill="rgba(115, 118, 225, 1)" />} onClick={() => setUploadedFiles(null)} />
+                            {isOn ? (
+                                <Tooltip content="Disable filter" relationship="label">
+                                    <Button size="large" icon={<FilterDismiss24Filled primaryFill="rgba(115, 118, 225, 1)" />} onClick={removeFilter} />
+                                </Tooltip>
+                            ) : (
+                                <Tooltip content="Enable filter" relationship="label">
+                                    <Button size="large" icon={<Filter24Filled primaryFill="rgba(115, 118, 225, 1)" />} onClick={removeFilter} />
+                                </Tooltip>
+                            )}
+                            <Tooltip content="Remove Files" relationship="label">
+                                <Button size="large" icon={<Dismiss24Filled primaryFill="rgba(115, 118, 225, 1)" />} onClick={removeFiles} />
                             </Tooltip>
                         </div>
                     )}

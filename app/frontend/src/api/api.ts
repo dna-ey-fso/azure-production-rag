@@ -11,7 +11,8 @@ import {
     Feedback,
     FeedbackResponse,
     ExperimentList,
-    DocumentList
+    DocumentList,
+    IRemoveRequest
 } from "./models";
 import { useLogin, appServicesToken } from "../authConfig";
 
@@ -133,6 +134,24 @@ export async function uploadFileApi(request: FormData, idToken: string | undefin
             }
         });
 
+        return response.data;
+    } catch (e) {
+        throw e;
+    }
+}
+
+export async function removeFilesApi(files: string[], idToken: string | undefined): Promise<any> {
+    const request: IRemoveRequest = {
+        filenames: files
+    };
+    try {
+        const response = await axios.post(
+            `${BACKEND_URI}/delete`,
+            { filenames: files },
+            {
+                headers: getHeaders(idToken)
+            }
+        );
         return response.data;
     } catch (e) {
         throw e;
