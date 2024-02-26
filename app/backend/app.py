@@ -322,7 +322,6 @@ async def upload():
             file = files[file_key]
             filename = file.filename
             temp_file_path = temp_dir_path / filename
-            logging.info("Current File: %s", filename)
             file_contents = file.read()
             async with aiofiles.open(temp_file_path, "wb") as temp_file:
                 await temp_file.write(file_contents)
@@ -336,6 +335,34 @@ async def upload():
         await init_prepdocs(ingestion_strategy, azure_credential, args)
         temp_dir.cleanup()
         return jsonify("File succesfully uploaded"), 202
+    except Exception as error:
+        logging.exception("Error", error)
+        return jsonify({"error": error}), 415
+    
+    
+@bp.route("/delete", methods=["POST"])
+async def delete():
+    try:
+        logging.info("Deleting files...")
+        request_json = await request.get_json()
+        filenames = request_json.get("filenames")
+        temp_dir = tempfile.TemporaryDirectory()
+        temp_dir_path = Path(temp_dir.name)
+        
+        for filename in filenames:
+            temp_file_path = temp_dir_path / filename
+            temp_file_path.touch()
+        
+        args = Namespace()
+        args.files = f"{str(temp_dir_path)}/*"
+        args = get_upload_args(args)
+        args.removeall = True
+
+        azure_credential = DefaultAzureCredential(exclude_shared_token_cache_credential=True)
+        ingestion_strategy = await setup_file_strategy(azure_credential, args)
+        await init_prepdocs(ingestion_strategy, azure_credential, args)
+        temp_dir.cleanup()
+        return jsonify("File succesfully deleted"), 202
     except Exception as error:
         logging.exception("Error", error)
         return jsonify({"error": error}), 415
@@ -585,7 +612,7 @@ def create_app():
         app.asgi_app = OpenTelemetryMiddleware(app.asgi_app)  # type: ignore[method-assign]
 
     # Level should be one of https://docs.python.org/3/library/logging.html#logging-levels
-    default_level = "INFO"  # In development, log more verbosely
+    default_level = "DEBUG"  # In development, log more verbosely
     if os.getenv("WEBSITE_HOSTNAME"):  # In production, don't log as heavily
         default_level = "WARNING"
     logging.basicConfig(level=os.getenv("APP_LOG_LEVEL", default_level))
