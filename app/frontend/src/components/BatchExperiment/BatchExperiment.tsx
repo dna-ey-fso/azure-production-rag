@@ -59,10 +59,9 @@ const BatchExperiment = ({ id, onRemove }: Props) => {
                             question={activeSample.question}
                             answer={activeSample.answer}
                             context={activeSample.context}
-                            relevance={activeSample.gpt_relevance}
-                            coherence={activeSample.gpt_coherence}
-                            similarity={activeSample.gpt_similarity}
-                            groundedness={activeSample.gpt_groundedness}
+                            relevance={activeSample.relevance_score}
+                            coherence={activeSample.coherence_score}
+                            groundedness={activeSample.groundedness_score}
                             removeActiveSample={removeActiveSample}
                         />
                     ) : (
@@ -71,11 +70,9 @@ const BatchExperiment = ({ id, onRemove }: Props) => {
                                 <EvalItem
                                     key={uuidv4()}
                                     question={evalItem.question}
-                                    answer={evalItem.answer}
-                                    relevance={evalItem.gpt_relevance}
-                                    coherence={evalItem.gpt_coherence}
-                                    similarity={evalItem.gpt_similarity}
-                                    groundedness={evalItem.gpt_groundedness}
+                                    relevance={evalItem.relevance_score}
+                                    coherence={evalItem.coherence_score}
+                                    groundedness={evalItem.groundedness_score}
                                     setActiveSample={setActiveSampleQ}
                                 />
                             ))}

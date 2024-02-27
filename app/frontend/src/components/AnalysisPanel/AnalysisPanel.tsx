@@ -36,18 +36,18 @@ export const AnalysisPanel = ({ answer, activeTab, activeCitation, citationHeigh
         const token = client ? await getToken(client) : undefined;
 
         if (activeCitation) {
-            const page = activeCitation.split("#")[1];
-            // Get the end of the string starting from "#"
+            // Get hash from the URL as it may contain #page=N
+            // which helps browser PDF renderer jump to correct page N
+            const originalHash = activeCitation.indexOf("#") ? activeCitation.split("#")[1] : "";
             const response = await fetch(activeCitation, {
                 method: "GET",
                 headers: getHeaders(token)
             });
             const citationContent = await response.blob();
-            var citationObjectUrl;
-            if (page !== "page=1") {
-                citationObjectUrl = URL.createObjectURL(citationContent) + "#" + page;
-            } else {
-                citationObjectUrl = URL.createObjectURL(citationContent) + "#" + "page=2";
+            let citationObjectUrl = URL.createObjectURL(citationContent);
+            // Add hash back to the new blob URL
+            if (originalHash) {
+                citationObjectUrl += "#" + originalHash;
             }
             setCitation(citationObjectUrl);
         }

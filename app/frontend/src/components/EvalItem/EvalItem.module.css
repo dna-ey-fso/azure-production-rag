@@ -134,7 +134,8 @@
 
 .metricsDetailedContainer {
     display: grid;
-    grid-template-columns: auto auto auto auto auto;
+    grid-template-columns: auto auto auto;
+    justify-items: center;
     margin-bottom: 1rem;
 }
 
