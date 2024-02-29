@@ -11,8 +11,8 @@ def get_upload_args(args):
     args.openaideployment = os.getenv("AZURE_OPENAI_EMB_DEPLOYMENT") if args.openaihost == "azure" else None
     args.openaikey = os.getenv("OPENAI_API_KEY")
     args.openaiorg = os.getenv("OPENAI_ORGANIZATION")
-    args.formrecognizerservice = os.getenv("AZURE_FORMRECOGNIZER_SERVICE")
-    args.formrecognizerkey = None
+    args.documentintelligenceservice = os.getenv("AZURE_DOCUMENTINTELLIGENCE_SERVICE")
+    args.documentintelligencekey = None
     args.storagekey = None
     args.container = os.getenv("AZURE_STORAGE_CONTAINER", None)
     args.subscriptionid = os.getenv("AZURE_SUBSCRIPTION_ID", None)

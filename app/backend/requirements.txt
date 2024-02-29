@@ -359,6 +359,7 @@ PyMuPDF
 pypdf
 azure-ai-formrecognizer
 azure-storage-file-datalake
+azure-ai-documentintelligence
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools

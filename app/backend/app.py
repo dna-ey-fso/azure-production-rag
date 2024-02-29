@@ -357,7 +357,7 @@ async def delete():
         args = Namespace()
         args.files = f"{str(temp_dir_path)}/*"
         args = get_upload_args(args)
-        args.removeall = True
+        args.remove = True
 
         azure_credential = DefaultAzureCredential(exclude_shared_token_cache_credential=True)
         ingestion_strategy = await setup_file_strategy(azure_credential, args)

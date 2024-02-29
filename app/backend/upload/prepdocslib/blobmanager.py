@@ -147,6 +147,8 @@ class BlobManager:
                 blobs = container_client.list_blob_names(name_starts_with=os.path.splitext(os.path.basename(prefix))[0])
             async for blob_path in blobs:
                 # This still supports PDFs split into individual pages, but we could remove in future to simplify code
+                if path is not None and blob_path == os.path.basename(path):
+                    await container_client.delete_blob(blob_path)
                 if (
                     prefix is not None
                     and (
