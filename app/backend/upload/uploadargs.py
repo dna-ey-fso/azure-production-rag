@@ -32,7 +32,7 @@ def get_upload_args(args):
     args.visionsecretname = os.getenv("VISION_SECRET_NAME", None)
     args.searchsecretname = os.getenv("AZURE_SEARCH_SECRET_NAME", None)
     args.searchimages = True if os.getenv("USE_GPT4V") else None
-    args.novectors = True if os.getenv("USE_VECTORS") == False else None
+    args.novectors = True if os.getenv("USE_VECTORS") is False else None
     args.localpdfparser = True if os.getenv("USE_LOCAL_PDF_PARSER") else None
     args.tenantid = os.getenv("AZURE_TENANT_ID", None)
     args.useintvectorization = os.getenv("USE_FEATURE_INT_VECTORIZATION", None)
