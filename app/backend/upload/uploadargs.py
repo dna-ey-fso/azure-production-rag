@@ -1,14 +1,19 @@
 import os
 
+
 def get_upload_args(args):
     args.storageaccount = os.environ["AZURE_STORAGE_ACCOUNT"]
     args.storageresourcegroup = os.environ["AZURE_STORAGE_CONTAINER"]
     args.searchservice = os.environ["AZURE_SEARCH_SERVICE"]
     args.index = os.environ["AZURE_SEARCH_INDEX"]
     args.openaihost = os.getenv("OPENAI_HOST", "azure")
-    args.openaimodelname = os.getenv("AZURE_OPENAI_EMB_MODEL_NAME", "text-embedding-ada-002")
+    args.openaimodelname = os.getenv(
+        "AZURE_OPENAI_EMB_MODEL_NAME", "text-embedding-ada-002"
+    )
     args.openaiservice = os.getenv("AZURE_OPENAI_SERVICE")
-    args.openaideployment = os.getenv("AZURE_OPENAI_EMB_DEPLOYMENT") if args.openaihost == "azure" else None
+    args.openaideployment = (
+        os.getenv("AZURE_OPENAI_EMB_DEPLOYMENT") if args.openaihost == "azure" else None
+    )
     args.openaikey = os.getenv("OPENAI_API_KEY")
     args.openaiorg = os.getenv("OPENAI_ORGANIZATION")
     args.documentintelligenceservice = os.getenv("AZURE_DOCUMENTINTELLIGENCE_SERVICE")
@@ -27,7 +32,7 @@ def get_upload_args(args):
     args.visionsecretname = os.getenv("VISION_SECRET_NAME", None)
     args.searchsecretname = os.getenv("AZURE_SEARCH_SECRET_NAME", None)
     args.searchimages = True if os.getenv("USE_GPT4V") else None
-    args.novectors = True if os.getenv("USE_VECTORS") == False else None
+    args.novectors = True if os.getenv("USE_VECTORS") is False else None
     args.localpdfparser = True if os.getenv("USE_LOCAL_PDF_PARSER") else None
     args.tenantid = os.getenv("AZURE_TENANT_ID", None)
     args.useintvectorization = os.getenv("USE_FEATURE_INT_VECTORIZATION", None)
@@ -37,5 +42,5 @@ def get_upload_args(args):
     args.remove = None
     args.category = None
     args.searchkey = None
-    
+
     return args
