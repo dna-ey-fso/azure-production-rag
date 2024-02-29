@@ -1,0 +1,31 @@
+{
+    "relevance": {
+        "mean_rating": 3.42,
+        "pass_count": 32,
+        "pass_rate": 0.53
+    },
+    "coherence": {
+        "mean_rating": 4.0,
+        "pass_count": 54,
+        "pass_rate": 0.9
+    },
+    "groundedness": {
+        "mean_rating": 4.53,
+        "pass_count": 53,
+        "pass_rate": 0.88
+    },
+    "latency": {
+        "mean": 3.42,
+        "max": 10.391553,
+        "min": 1.052216
+    },
+    "answer_length": {
+        "mean": 646.62,
+        "max": 2391,
+        "min": 80
+    },
+    "has_citation": {
+        "total": 59,
+        "rate": 0.98
+    }
+}

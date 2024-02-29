@@ -2,23 +2,27 @@ import styles from "./UploadFiles.module.css";
 
 import { Callout, IIconProps, IconButton, Label, PrimaryButton, Text } from "@fluentui/react";
 import { ArrowUpload24Filled } from "@fluentui/react-icons";
-import { useState, ChangeEvent, FormEvent } from "react";
-import { IUploadResponse, uploadFileApi } from "../../api";
+import { useState, ChangeEvent, FormEvent, useEffect } from "react";
 import { Button, Tooltip } from "@fluentui/react-components";
+import { Send24Filled, Dismiss24Filled, Filter24Filled, FilterDismiss24Filled } from "@fluentui/react-icons";
 
 import { PuffLoader } from "react-spinners";
 import { useMutation } from "react-query";
 
+import { IRemoveResponse, IUploadResponse, removeFilesApi, uploadFileApi } from "../../api";
+
 interface Props {
-    setUploadedFiles: (files: File[]) => void;
+    setDocFilter: (files: string | undefined) => void;
 }
-const UploadFiles = ({ setUploadedFiles }: Props) => {
+const UploadFiles = ({ setDocFilter }: Props) => {
     const [isCalloutVisible, setIsCalloutVisible] = useState<boolean>(false);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [uploadedFile, setUploadedFile] = useState<IUploadResponse>();
     const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isOn, setIsOn] = useState<boolean>(true);
+    const [uploadedFiles, setUploadedFiles] = useState<File[] | null>(null);
 
-    const mutation = useMutation<any, Error, FormData>(formData => uploadFileApi(formData, undefined), {
+    const uploadMutation = useMutation<any, Error, FormData>(formData => uploadFileApi(formData, undefined), {
         onSettled: (data, error) => {
             // This callback is called whether the mutation succeeds or fails
             setIsLoading(false);
@@ -31,6 +35,18 @@ const UploadFiles = ({ setUploadedFiles }: Props) => {
             }
 
             setSelectedFiles([]);
+        }
+    });
+
+    const removeMutation = useMutation<any, Error, { files: string[]; idToken?: string }>(({ files }) => removeFilesApi(files, undefined), {
+        onSettled: (data, error) => {
+            setIsLoading(false);
+
+            if (error) {
+                console.log("Deletion failed:", error);
+            } else {
+                console.log("Deletion Successful");
+            }
         }
     });
 
@@ -63,7 +79,7 @@ const UploadFiles = ({ setUploadedFiles }: Props) => {
         });
 
         try {
-            const response: IUploadResponse = await mutation.mutateAsync(formData);
+            const response: IUploadResponse = await uploadMutation.mutateAsync(formData);
             setUploadedFiles(selectedFiles);
         } catch (error) {
             console.log(error);
@@ -72,15 +88,76 @@ const UploadFiles = ({ setUploadedFiles }: Props) => {
         }
     };
 
+    const removeFiles = async () => {
+        setIsLoading(true);
+        const response: IRemoveResponse = await removeMutation.mutateAsync({
+            files: uploadedFiles?.map(file => file.name) as string[]
+        });
+
+        setUploadedFiles(null);
+        setDocFilter(undefined);
+    };
+
+    const removeFilter = () => {
+        setDocFilter(undefined);
+        setIsOn(!isOn);
+    };
+
+    useEffect(() => {
+        if (isOn && uploadedFiles) {
+            constructAndSetDocFilter();
+        } else {
+            setDocFilter(undefined);
+        }
+    }, [isOn, uploadedFiles]);
+
+    const constructAndSetDocFilter = () => {
+        if (uploadedFiles && isOn) {
+            const names = uploadedFiles.map(file => file.name);
+
+            if (names.length === 1) {
+                setDocFilter(names[0]);
+            } else {
+                const str: string = names.join(" OR ");
+                setDocFilter(str);
+            }
+        }
+    };
+
     const addIcon: IIconProps = { iconName: "Add" };
     const Remove: IIconProps = { iconName: "delete" };
 
     if (isLoading) {
-        return <PuffLoader color="rgba(115, 118, 225, 1)" loading={isLoading} size={50} className={styles.loader} />;
+        return (
+            <div className={styles.uploadButtonContainer}>
+                <PuffLoader color="rgba(115, 118, 225, 1)" loading={isLoading} size={50} className={styles.loader} />
+            </div>
+        );
+    }
+
+    if (uploadedFiles) {
+        return (
+            <div className={styles.uploadButtonContainer}>
+                <div>
+                    {isOn ? (
+                        <Tooltip content="Disable filter" relationship="label">
+                            <Button size="large" icon={<FilterDismiss24Filled primaryFill="rgba(115, 118, 225, 1)" />} onClick={removeFilter} />
+                        </Tooltip>
+                    ) : (
+                        <Tooltip content="Enable filter" relationship="label">
+                            <Button size="large" icon={<Filter24Filled primaryFill="rgba(115, 118, 225, 1)" />} onClick={removeFilter} />
+                        </Tooltip>
+                    )}
+                    <Tooltip content="Remove Files" relationship="label">
+                        <Button size="large" icon={<Dismiss24Filled primaryFill="rgba(115, 118, 225, 1)" />} onClick={removeFiles} />
+                    </Tooltip>
+                </div>
+            </div>
+        );
     }
 
     return (
-        <div className={`${styles.container}`}>
+        <div className={`${styles.uploadButtonContainer}`}>
             <div>
                 <Tooltip content="Upload Document" relationship="label">
                     <div>
@@ -120,11 +197,7 @@ const UploadFiles = ({ setUploadedFiles }: Props) => {
                                 </div>
                             )}
 
-                            {/* Show a loading message while files are being uploaded */}
-                            {mutation.isLoading && <div className={styles.padding8}>{"uploading files..."}</div>}
-                            {uploadedFile && <div className={styles.padding8}>{uploadedFile.message}</div>}
                             {/* Display the list of selected files */}
-
                             {selectedFiles.map((item, index) => {
                                 return (
                                     <div key={index} className={styles.list}>
