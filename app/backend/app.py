@@ -1,23 +1,18 @@
+import asyncio
 import dataclasses
 import io
 import json
 import logging
 import mimetypes
 import os
+import tempfile
+from argparse import Namespace
+from datetime import datetime
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, Union, cast
-from datetime import datetime
-from argparse import Namespace
-from upload.prepdocs import setup_file_strategy
-from upload.prepdocs import main as init_prepdocs
-from upload.uploadargs import get_upload_args
 
-import aiohttp
 import aiofiles
-import asyncio
-import tempfile
-
-
+import aiohttp
 from azure.core.credentials import AzureKeyCredential
 from azure.core.credentials_async import AsyncTokenCredential
 from azure.core.exceptions import ResourceNotFoundError
@@ -27,7 +22,6 @@ from azure.monitor.opentelemetry import configure_azure_monitor
 from azure.search.documents.aio import SearchClient
 from azure.search.documents.indexes.aio import SearchIndexClient, SearchIndexerClient
 from azure.storage.blob.aio import BlobServiceClient
-from azure.storage.blob import ContentSettings
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
@@ -55,6 +49,8 @@ from config import (
     CONFIG_ASK_VISION_APPROACH,
     CONFIG_AUTH_CLIENT,
     CONFIG_BLOB_CONTAINER_CLIENT,
+    CONFIG_BLOB_EVALUATE_CONTAINER_CLIENT,
+    CONFIG_BLOB_FEEDBACK_CONTAINER_CLIENT,
     CONFIG_CHAT_APPROACH,
     CONFIG_CHAT_VISION_APPROACH,
     CONFIG_GPT4V_DEPLOYED,
@@ -62,12 +58,13 @@ from config import (
     CONFIG_SEARCH_CLIENT,
     CONFIG_SEMANTIC_RANKER_DEPLOYED,
     CONFIG_VECTOR_SEARCH_ENABLED,
-    CONFIG_BLOB_EVALUATE_CONTAINER_CLIENT,
-    CONFIG_BLOB_FEEDBACK_CONTAINER_CLIENT,
 )
 from core.authentication import AuthenticationHelper
 from decorators import authenticated, authenticated_path
 from error import error_dict, error_response
+from upload.prepdocs import main as init_prepdocs
+from upload.prepdocs import setup_file_strategy
+from upload.uploadargs import get_upload_args
 
 bp = Blueprint("routes", __name__, static_folder="static")
 # Fix Windows registry issue with mimetypes
@@ -94,7 +91,9 @@ async def favicon():
 
 @bp.route("/assets/<path:path>")
 async def assets(path):
-    return await send_from_directory(Path(__file__).resolve().parent / "static" / "assets", path)
+    return await send_from_directory(
+        Path(__file__).resolve().parent / "static" / "assets", path
+    )
 
 
 @bp.route("/content/<path>")
@@ -127,7 +126,9 @@ async def content_file(path: str):
     blob_file = io.BytesIO()
     await blob.readinto(blob_file)
     blob_file.seek(0)
-    return await send_file(blob_file, mimetype=mime_type, as_attachment=False, attachment_filename=path)
+    return await send_file(
+        blob_file, mimetype=mime_type, as_attachment=False, attachment_filename=path
+    )
 
 
 @bp.route("/ask", methods=["POST"])
@@ -146,7 +147,9 @@ async def ask(auth_claims: Dict[str, Any]):
         else:
             approach = cast(Approach, current_app.config[CONFIG_ASK_APPROACH])
         r = await approach.run(
-            request_json["messages"], context=context, session_state=request_json.get("session_state")
+            request_json["messages"],
+            context=context,
+            session_state=request_json.get("session_state"),
         )
         return jsonify(r)
     except Exception as error:
@@ -216,7 +219,9 @@ async def feedback():
     request_json = await request.get_json()
     feedback = json.dumps(request_json)
     try:
-        blob_feedback_container_client = current_app.config[CONFIG_BLOB_FEEDBACK_CONTAINER_CLIENT]
+        blob_feedback_container_client = current_app.config[
+            CONFIG_BLOB_FEEDBACK_CONTAINER_CLIENT
+        ]
 
         current_time = datetime.now()
         timestamp_str = current_time.strftime("%Y%m%d%H%M%S%f")
@@ -234,12 +239,18 @@ async def feedback():
 @bp.route("/feedback", methods=["GET"])
 async def feedback_list():
     try:
-        blob_feedback_container_client = current_app.config[CONFIG_BLOB_FEEDBACK_CONTAINER_CLIENT]
-        blob_properties_list = blob_feedback_container_client.list_blobs(name_starts_with="Feedback")
+        blob_feedback_container_client = current_app.config[
+            CONFIG_BLOB_FEEDBACK_CONTAINER_CLIENT
+        ]
+        blob_properties_list = blob_feedback_container_client.list_blobs(
+            name_starts_with="Feedback"
+        )
 
         feedback_jsons = []
         async for blob_property in blob_properties_list:
-            blob = await blob_feedback_container_client.get_blob_client(blob_property.name).download_blob()
+            blob = await blob_feedback_container_client.get_blob_client(
+                blob_property.name
+            ).download_blob()
             feedback_json = json.loads(await blob.content_as_text())
             feedback_jsons.append(feedback_json)
 
@@ -252,7 +263,9 @@ async def feedback_list():
 @bp.route("/experiment_list", methods=["GET"])
 async def experiment_list():
     try:
-        blob_evaluate_container_client = current_app.config[CONFIG_BLOB_EVALUATE_CONTAINER_CLIENT]
+        blob_evaluate_container_client = current_app.config[
+            CONFIG_BLOB_EVALUATE_CONTAINER_CLIENT
+        ]
         blob_properties_list = blob_evaluate_container_client.list_blobs()
 
         experiments_set = set()
@@ -270,15 +283,23 @@ async def experiment_list():
 @bp.route("/experiment", methods=["GET"])
 async def experiment():
     experiment_name = request.args.get("name")
-    blob_evaluate_container_client = current_app.config[CONFIG_BLOB_EVALUATE_CONTAINER_CLIENT]
+    blob_evaluate_container_client = current_app.config[
+        CONFIG_BLOB_EVALUATE_CONTAINER_CLIENT
+    ]
     try:
         result = {"eval_results": "", "evaluate_parameters": "", "summary": ""}
         for key in result.keys():
             file_name = f"{key}.json" if "eval_results" not in key else f"{key}.jsonl"
             path = f"{experiment_name}/{file_name}"
-            blob = await blob_evaluate_container_client.get_blob_client(path).download_blob()
+            blob = await blob_evaluate_container_client.get_blob_client(
+                path
+            ).download_blob()
             if file_name.endswith(".jsonl"):
-                json_data = [json.loads(line) for line in (await blob.content_as_text()).splitlines() if line.strip()]
+                json_data = [
+                    json.loads(line)
+                    for line in (await blob.content_as_text()).splitlines()
+                    if line.strip()
+                ]
             else:
                 json_data = json.loads(await blob.content_as_text())
             result[key] = json_data
@@ -305,7 +326,9 @@ async def start_evaluation(payload):
 
 async def post_payload_handler(session, payload):
     try:
-        async with session.post("https://rageval.azurewebsites.net/api/evaluate", json=payload):
+        async with session.post(
+            "https://rageval.azurewebsites.net/api/evaluate", json=payload
+        ):
             pass
     finally:
         await session.close()
@@ -331,7 +354,9 @@ async def upload():
         args.files = f"{str(temp_dir_path)}/*"
         args = get_upload_args(args)
 
-        azure_credential = DefaultAzureCredential(exclude_shared_token_cache_credential=True)
+        azure_credential = DefaultAzureCredential(
+            exclude_shared_token_cache_credential=True
+        )
         ingestion_strategy = await setup_file_strategy(azure_credential, args)
         await init_prepdocs(ingestion_strategy, azure_credential, args)
         temp_dir.cleanup()
@@ -339,8 +364,8 @@ async def upload():
     except Exception as error:
         logging.exception("Error", error)
         return jsonify({"error": error}), 415
-    
-    
+
+
 @bp.route("/delete", methods=["POST"])
 async def delete():
     try:
@@ -349,17 +374,19 @@ async def delete():
         filenames = request_json.get("filenames")
         temp_dir = tempfile.TemporaryDirectory()
         temp_dir_path = Path(temp_dir.name)
-        
+
         for filename in filenames:
             temp_file_path = temp_dir_path / filename
             temp_file_path.touch()
-        
+
         args = Namespace()
         args.files = f"{str(temp_dir_path)}/*"
         args = get_upload_args(args)
         args.remove = True
 
-        azure_credential = DefaultAzureCredential(exclude_shared_token_cache_credential=True)
+        azure_credential = DefaultAzureCredential(
+            exclude_shared_token_cache_credential=True
+        )
         ingestion_strategy = await setup_file_strategy(azure_credential, args)
         await init_prepdocs(ingestion_strategy, azure_credential, args)
         temp_dir.cleanup()
@@ -392,7 +419,9 @@ def config():
     return jsonify(
         {
             "showGPT4VOptions": current_app.config[CONFIG_GPT4V_DEPLOYED],
-            "showSemanticRankerOption": current_app.config[CONFIG_SEMANTIC_RANKER_DEPLOYED],
+            "showSemanticRankerOption": current_app.config[
+                CONFIG_SEMANTIC_RANKER_DEPLOYED
+            ],
             "showVectorOption": current_app.config[CONFIG_VECTOR_SEARCH_ENABLED],
         }
     )
@@ -410,23 +439,35 @@ async def setup_clients():
     # Shared by all OpenAI deployments
     OPENAI_HOST = os.getenv("OPENAI_HOST", "azure")
     OPENAI_CHATGPT_MODEL = os.environ["AZURE_OPENAI_CHATGPT_MODEL"]
-    OPENAI_EMB_MODEL = os.getenv("AZURE_OPENAI_EMB_MODEL_NAME", "text-embedding-ada-002")
+    OPENAI_EMB_MODEL = os.getenv(
+        "AZURE_OPENAI_EMB_MODEL_NAME", "text-embedding-ada-002"
+    )
     # Used with Azure OpenAI deployments
     AZURE_OPENAI_SERVICE = os.getenv("AZURE_OPENAI_SERVICE")
     AZURE_OPENAI_GPT4V_DEPLOYMENT = os.environ.get("AZURE_OPENAI_GPT4V_DEPLOYMENT")
     AZURE_OPENAI_GPT4V_MODEL = os.environ.get("AZURE_OPENAI_GPT4V_MODEL")
     AZURE_OPENAI_CHATGPT_DEPLOYMENT = (
-        os.getenv("AZURE_OPENAI_CHATGPT_DEPLOYMENT") if OPENAI_HOST.startswith("azure") else None
+        os.getenv("AZURE_OPENAI_CHATGPT_DEPLOYMENT")
+        if OPENAI_HOST.startswith("azure")
+        else None
     )
-    AZURE_OPENAI_EMB_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMB_DEPLOYMENT") if OPENAI_HOST.startswith("azure") else None
+    AZURE_OPENAI_EMB_DEPLOYMENT = (
+        os.getenv("AZURE_OPENAI_EMB_DEPLOYMENT")
+        if OPENAI_HOST.startswith("azure")
+        else None
+    )
     AZURE_VISION_ENDPOINT = os.getenv("AZURE_VISION_ENDPOINT", "")
     # Used only with non-Azure OpenAI deployments
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     OPENAI_ORGANIZATION = os.getenv("OPENAI_ORGANIZATION")
 
     AZURE_TENANT_ID = os.getenv("AZURE_TENANT_ID")
-    AZURE_USE_AUTHENTICATION = os.getenv("AZURE_USE_AUTHENTICATION", "").lower() == "true"
-    AZURE_ENFORCE_ACCESS_CONTROL = os.getenv("AZURE_ENFORCE_ACCESS_CONTROL", "").lower() == "true"
+    AZURE_USE_AUTHENTICATION = (
+        os.getenv("AZURE_USE_AUTHENTICATION", "").lower() == "true"
+    )
+    AZURE_ENFORCE_ACCESS_CONTROL = (
+        os.getenv("AZURE_ENFORCE_ACCESS_CONTROL", "").lower() == "true"
+    )
     AZURE_SERVER_APP_ID = os.getenv("AZURE_SERVER_APP_ID")
     AZURE_SERVER_APP_SECRET = os.getenv("AZURE_SERVER_APP_SECRET")
     AZURE_CLIENT_APP_ID = os.getenv("AZURE_CLIENT_APP_ID")
@@ -437,7 +478,9 @@ async def setup_clients():
 
     AZURE_SEARCH_QUERY_LANGUAGE = os.getenv("AZURE_SEARCH_QUERY_LANGUAGE", "en-us")
     AZURE_SEARCH_QUERY_SPELLER = os.getenv("AZURE_SEARCH_QUERY_SPELLER", "lexicon")
-    AZURE_SEARCH_SEMANTIC_RANKER = os.getenv("AZURE_SEARCH_SEMANTIC_RANKER", "free").lower()
+    AZURE_SEARCH_SEMANTIC_RANKER = os.getenv(
+        "AZURE_SEARCH_SEMANTIC_RANKER", "free"
+    ).lower()
 
     USE_GPT4V = os.getenv("USE_GPT4V", "").lower() == "true"
 
@@ -445,15 +488,21 @@ async def setup_clients():
     # just use 'az login' locally, and managed identity when deployed on Azure). If you need to use keys, use separate AzureKeyCredential instances with the
     # keys for each service
     # If you encounter a blocking error during a DefaultAzureCredential resolution, you can exclude the problematic credential by using a parameter (ex. exclude_shared_token_cache_credential=True)
-    azure_credential = DefaultAzureCredential(exclude_shared_token_cache_credential=True)
+    azure_credential = DefaultAzureCredential(
+        exclude_shared_token_cache_credential=True
+    )
 
     # Fetch any necessary secrets from Key Vault
     search_key = None
     if AZURE_KEY_VAULT_NAME:
         key_vault_client = SecretClient(
-            vault_url=f"https://{AZURE_KEY_VAULT_NAME}.vault.azure.net", credential=azure_credential
+            vault_url=f"https://{AZURE_KEY_VAULT_NAME}.vault.azure.net",
+            credential=azure_credential,
         )
-        search_key = SEARCH_SECRET_NAME and (await key_vault_client.get_secret(SEARCH_SECRET_NAME)).value
+        search_key = (
+            SEARCH_SECRET_NAME
+            and (await key_vault_client.get_secret(SEARCH_SECRET_NAME)).value
+        )
         await key_vault_client.close()
 
     # Set up clients for AI Search and Storage
@@ -476,7 +525,8 @@ async def setup_clients():
     print(search_indexer_client)
 
     blob_client = BlobServiceClient(
-        account_url=f"https://{AZURE_STORAGE_ACCOUNT}.blob.core.windows.net", credential=azure_credential
+        account_url=f"https://{AZURE_STORAGE_ACCOUNT}.blob.core.windows.net",
+        credential=azure_credential,
     )
     blob_container_client = blob_client.get_container_client(AZURE_STORAGE_CONTAINER)
     evaluate_blob_container_client = blob_client.get_container_client("batchevaluate")
@@ -484,7 +534,9 @@ async def setup_clients():
 
     # Set up authentication helper
     auth_helper = AuthenticationHelper(
-        search_index=(await search_index_client.get_index(AZURE_SEARCH_INDEX)) if AZURE_USE_AUTHENTICATION else None,
+        search_index=(await search_index_client.get_index(AZURE_SEARCH_INDEX))
+        if AZURE_USE_AUTHENTICATION
+        else None,
         use_authentication=AZURE_USE_AUTHENTICATION,
         server_app_id=AZURE_SERVER_APP_ID,
         server_app_secret=AZURE_SERVER_APP_SECRET,
@@ -497,7 +549,9 @@ async def setup_clients():
     openai_client: AsyncOpenAI
 
     if OPENAI_HOST.startswith("azure"):
-        token_provider = get_bearer_token_provider(azure_credential, "https://cognitiveservices.azure.com/.default")
+        token_provider = get_bearer_token_provider(
+            azure_credential, "https://cognitiveservices.azure.com/.default"
+        )
 
         if OPENAI_HOST == "azure_custom":
             endpoint = os.environ["AZURE_OPENAI_CUSTOM_URL"]
@@ -511,7 +565,9 @@ async def setup_clients():
             azure_ad_token_provider=token_provider,
         )
     elif OPENAI_HOST == "local":
-        openai_client = AsyncOpenAI(base_url=os.environ["OPENAI_BASE_URL"], api_key="no-key-required")
+        openai_client = AsyncOpenAI(
+            base_url=os.environ["OPENAI_BASE_URL"], api_key="no-key-required"
+        )
     else:
         openai_client = AsyncOpenAI(
             api_key=OPENAI_API_KEY,
@@ -522,12 +578,20 @@ async def setup_clients():
     current_app.config[CONFIG_SEARCH_CLIENT] = search_client
     current_app.config[CONFIG_BLOB_CONTAINER_CLIENT] = blob_container_client
     current_app.config[CONFIG_AUTH_CLIENT] = auth_helper
-    current_app.config[CONFIG_BLOB_EVALUATE_CONTAINER_CLIENT] = evaluate_blob_container_client
-    current_app.config[CONFIG_BLOB_FEEDBACK_CONTAINER_CLIENT] = feedback_blob_container_client
+    current_app.config[
+        CONFIG_BLOB_EVALUATE_CONTAINER_CLIENT
+    ] = evaluate_blob_container_client
+    current_app.config[
+        CONFIG_BLOB_FEEDBACK_CONTAINER_CLIENT
+    ] = feedback_blob_container_client
 
     current_app.config[CONFIG_GPT4V_DEPLOYED] = bool(USE_GPT4V)
-    current_app.config[CONFIG_SEMANTIC_RANKER_DEPLOYED] = AZURE_SEARCH_SEMANTIC_RANKER != "disabled"
-    current_app.config[CONFIG_VECTOR_SEARCH_ENABLED] = os.getenv("USE_VECTORS", "").lower() != "false"
+    current_app.config[CONFIG_SEMANTIC_RANKER_DEPLOYED] = (
+        AZURE_SEARCH_SEMANTIC_RANKER != "disabled"
+    )
+    current_app.config[CONFIG_VECTOR_SEARCH_ENABLED] = (
+        os.getenv("USE_VECTORS", "").lower() != "false"
+    )
 
     # Various approaches to integrate GPT and external knowledge, most applications will use a single one of these patterns
     # or some derivative, here we include several for exploration purposes
@@ -546,8 +610,9 @@ async def setup_clients():
     )
 
     if USE_GPT4V:
-
-        token_provider = get_bearer_token_provider(azure_credential, "https://cognitiveservices.azure.com/.default")
+        token_provider = get_bearer_token_provider(
+            azure_credential, "https://cognitiveservices.azure.com/.default"
+        )
 
         current_app.config[CONFIG_ASK_VISION_APPROACH] = RetrieveThenReadVisionApproach(
             search_client=search_client,
@@ -566,7 +631,9 @@ async def setup_clients():
             query_speller=AZURE_SEARCH_QUERY_SPELLER,
         )
 
-        current_app.config[CONFIG_CHAT_VISION_APPROACH] = ChatReadRetrieveReadVisionApproach(
+        current_app.config[
+            CONFIG_CHAT_VISION_APPROACH
+        ] = ChatReadRetrieveReadVisionApproach(
             search_client=search_client,
             openai_client=openai_client,
             blob_container_client=blob_container_client,
