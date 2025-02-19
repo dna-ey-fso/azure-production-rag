@@ -363,3 +363,8 @@ azure-ai-documentintelligence
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
+
+# Installation of frugalGPT 
+git+https://github.com/AdrienEY/FrugalGPT.git
+
+
