@@ -220,6 +220,7 @@ class ChatReadRetrieveReadApproach(ChatApproach):
         return (extra_info, chat_coroutine)
 
     def create_server_response(self, server_response: Dict[str, Any], should_stream: bool):
+        print(f"\nTotal cost: ${server_response.get('total_cost', server_response['cost']):.6f}")
         response = {
             "choices": [{
                 "message": {
@@ -228,8 +229,15 @@ class ChatReadRetrieveReadApproach(ChatApproach):
                 },
                 "metadata": {
                     "cost": server_response["cost"],
+                    "total_cost": server_response.get("total_cost", server_response["cost"]),
                     "model_used": server_response["model_used"]
                 }
             }]
         }
-        return AsyncStream([response]) if should_stream else response
+        if should_stream:
+            async def stream_generator():
+                for c in server_response["answer"]:
+                    yield {"choices": [{"delta": {"content": c}}]}
+            
+            return AsyncStream({"generator": stream_generator()})
+        return response

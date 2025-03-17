@@ -690,6 +690,18 @@ def create_app():
         default_level = "WARNING"
     logging.basicConfig(level=os.getenv("APP_LOG_LEVEL", default_level))
 
+    # Disable debug logs for specific modules
+    logging.getLogger("azure.identity").setLevel(logging.ERROR)
+    logging.getLogger("aiohttp").setLevel(logging.ERROR)
+    logging.getLogger("httpx").setLevel(logging.ERROR)
+    logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
+    logging.getLogger("openai._base_client").setLevel(logging.WARNING)
+    logging.getLogger("httpcore.connection").setLevel(logging.WARNING)
+    logging.getLogger("httpcore.http11").setLevel(logging.WARNING)
+
+
+
+
     if allowed_origin := os.getenv("ALLOWED_ORIGIN"):
         app.logger.info("CORS enabled for %s", allowed_origin)
         cors(app, allow_origin=allowed_origin, allow_methods=["GET", "POST"])
