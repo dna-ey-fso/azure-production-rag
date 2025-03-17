@@ -1,4 +1,4 @@
-from typing import Any, Coroutine, List, Literal, Optional, Union, overload
+from typing import Any, Coroutine, Dict, List, Literal, Optional, Union, overload
 
 from azure.search.documents.aio import SearchClient
 from azure.search.documents.models import VectorQuery
@@ -13,6 +13,7 @@ from approaches.approach import ThoughtStep
 from approaches.chatapproach import ChatApproach
 from core.authentication import AuthenticationHelper
 from core.modelhelper import get_token_limit
+from core.server_client import ServerClient
 
 
 class ChatReadRetrieveReadApproach(ChatApproach):
@@ -49,13 +50,14 @@ class ChatReadRetrieveReadApproach(ChatApproach):
         self.query_language = query_language
         self.query_speller = query_speller
         self.chatgpt_token_limit = get_token_limit(chatgpt_model)
+        self.server_client = ServerClient()
 
     @property
     def system_message_chat_conversation(self):
-        return """Assistant helps the company employees with their healthcare plan questions, and questions about the employee handbook. Be brief in your answers.
-        Answer ONLY with the facts listed in the list of sources below. If there isn't enough information below, say you don't know. Do not generate answers that don't use the sources below. If asking a clarifying question to the user would help, ask the question.
+        return """Assistant helps with both company-specific information and general knowledge questions. For company-related questions about healthcare plans and the employee handbook, use the provided sources and cite them using square brackets.
+        For general knowledge questions, you can answer directly using your built-in knowledge.
+        If the question is company-related, prioritize information from the sources below. If it's a general knowledge question, you can answer freely without need for sources.
         For tabular information return it as an html table. Do not return markdown format. If the question is not in English, answer in the language used in the question.
-        Each source has a name followed by colon and the actual information, always include the source name for each fact you use in the response. Use square brackets to reference the source, for example [info1.txt]. Don't combine sources, list each source separately, for example [info1.txt][info2.pdf].
         {follow_up_questions_prompt}
         {injected_prompt}
         """
@@ -93,6 +95,20 @@ class ChatReadRetrieveReadApproach(ChatApproach):
         use_semantic_ranker = True if overrides.get("semantic_ranker") and has_text else False
 
         original_user_query = history[-1]["content"]
+
+        # First try to get response from server
+        try:
+            server_response = await self.server_client.execute_query(original_user_query)
+            if server_response and server_response.get("answer"):
+                return {
+                    "data_points": {"text": []},
+                    "thoughts": [
+                        ThoughtStep("Server Response", server_response),
+                    ],
+                }, self.create_server_response(server_response, should_stream)
+        except Exception as e:
+            print(f"Server request failed, falling back to default approach: {str(e)}")
+
         user_query_request = "Generate search query for: " + original_user_query
 
         tools: List[ChatCompletionToolParam] = [
@@ -202,3 +218,18 @@ class ChatReadRetrieveReadApproach(ChatApproach):
             stream=should_stream,
         )
         return (extra_info, chat_coroutine)
+
+    def create_server_response(self, server_response: Dict[str, Any], should_stream: bool):
+        response = {
+            "choices": [{
+                "message": {
+                    "content": server_response["answer"],
+                    "role": "assistant"
+                },
+                "metadata": {
+                    "cost": server_response["cost"],
+                    "model_used": server_response["model_used"]
+                }
+            }]
+        }
+        return AsyncStream([response]) if should_stream else response

@@ -12,6 +12,7 @@ from openai.types.chat import (
 
 from approaches.approach import Approach
 from core.messagebuilder import MessageBuilder
+from core.server_client import ServerClient
 
 
 class ChatApproach(Approach, ABC):
@@ -46,6 +47,34 @@ class ChatApproach(Approach, ABC):
     If the question is not in English, translate the question to English before generating the search query.
     If you cannot generate a search query, return just the number 0.
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.server_client = ServerClient()
+
+    async def get_server_response(self, query: str, stream: bool = False) -> Optional[dict]:
+        try:
+            server_response = await self.server_client.execute_query(query)
+            if server_response and server_response.get("answer"):
+                return {
+                    "choices": [{
+                        "message": {
+                            "content": server_response["answer"],
+                            "role": self.ASSISTANT
+                        },
+                        "context": {
+                            "data_points": {"text": []},
+                            "thoughts": [{"thought": "Retrieved from server"}]
+                        },
+                        "metadata": {
+                            "cost": server_response["cost"],
+                            "model_used": server_response["model_used"]
+                        }
+                    }]
+                }
+        except Exception as e:
+            print(f"Server request failed: {str(e)}")
+        return None
 
     @property
     @abstractmethod

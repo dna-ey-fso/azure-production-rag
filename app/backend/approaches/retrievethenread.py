@@ -8,6 +8,7 @@ from openai import AsyncOpenAI
 from approaches.approach import Approach, ThoughtStep
 from core.authentication import AuthenticationHelper
 from core.messagebuilder import MessageBuilder
+from core.server_client import ServerClient
 
 # Replace these with your own values, either in environment variables or directly here
 AZURE_STORAGE_ACCOUNT = os.getenv("AZURE_STORAGE_ACCOUNT")
@@ -69,6 +70,7 @@ info4.pdf: In-network institutions include Overlake, Swedish and others in the r
         self.content_field = content_field
         self.query_language = query_language
         self.query_speller = query_speller
+        self.server_client = ServerClient()
 
     async def run(
         self,
@@ -78,6 +80,31 @@ info4.pdf: In-network institutions include Overlake, Swedish and others in the r
         context: dict[str, Any] = {},
     ) -> Union[dict[str, Any], AsyncGenerator[dict[str, Any], None]]:
         q = messages[-1]["content"]
+        
+        # Try server first
+        try:
+            server_response = await self.server_client.execute_query(q)
+            if server_response and server_response.get("answer"):
+                return {
+                    "choices": [{
+                        "message": {
+                            "content": server_response["answer"],
+                            "role": "assistant"
+                        },
+                        "context": {
+                            "data_points": {"text": []},
+                            "thoughts": [{"thought": "Retrieved from server"}]
+                        },
+                        "metadata": {
+                            "cost": server_response["cost"],
+                            "model_used": server_response["model_used"]
+                        }
+                    }]
+                }
+        except Exception as e:
+            print(f"Server request failed, falling back to default approach: {str(e)}")
+
+        # Continue with existing flow if server fails
         overrides = context.get("overrides", {})
         auth_claims = context.get("auth_claims", {})
         has_text = overrides.get("retrieval_mode") in ["text", "hybrid", None]
