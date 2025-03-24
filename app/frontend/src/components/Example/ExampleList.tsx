@@ -3,9 +3,9 @@ import { Example } from "./Example";
 import styles from "./Example.module.css";
 
 const DEFAULT_EXAMPLES: string[] = [
-    "Give me a summary of the report by the ombudsman of Victoria.",
-    "What causes for the rise of crime are identified?",
-    "What is the conclusion of the report?"
+    "What is Northwind Health Plus?",
+    "What additional services might some hospitals offer?",
+    "What is Northwind Health Plus and what services does it cover?"
 ];
 
 const GPT4V_EXAMPLES: string[] = [

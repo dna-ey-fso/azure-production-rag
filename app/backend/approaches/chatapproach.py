@@ -122,6 +122,7 @@ class ChatApproach(Approach, ABC):
             total_token_count += potential_message_count
         return message_builder.messages
 
+
     async def run_without_streaming(
         self,
         history: list[dict[str, str]],

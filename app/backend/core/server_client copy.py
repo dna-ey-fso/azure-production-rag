@@ -5,9 +5,9 @@ class ServerClient:
     def __init__(self, server_url: str = "http://127.0.0.1:8000"):
         self.server_url = server_url
 
-    async def execute_query(self, server_request: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_query(self, prompt: str) -> Dict[str, Any]:
         async with aiohttp.ClientSession() as session:
-            cascade_result = await self._execute(session, server_request, "execute_cascade")
+            cascade_result = await self._execute(session, prompt, "execute_cascade")
             #gpt4o_result = await self._execute(session, prompt, "execute_gpt4o")
             cascade_total_cost = cascade_result["total_cost"] 
             #gpt4o_total_cost = gpt4o_result["total_cost"]
@@ -22,13 +22,11 @@ class ServerClient:
                 #"total_cost_gpt4o": gpt4o_total_cost
             }
 
-    async def _execute(self, session: aiohttp.ClientSession, server_request: Dict[str, Any], endpoint: str) -> Dict[str, Any]:
+    async def _execute(self, session: aiohttp.ClientSession, prompt: str, endpoint: str) -> Dict[str, Any]:
         async with session.post(
             f"{self.server_url}/{endpoint}",
-            json=server_request
-            
+            json={"prompt": prompt}
         ) as response:
-            #print(server_request)
             if response.status == 200:
                 result = await response.json()
                 if result["status"] == "success":

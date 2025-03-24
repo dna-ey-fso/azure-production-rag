@@ -54,10 +54,10 @@ class ChatReadRetrieveReadApproach(ChatApproach):
 
     @property
     def system_message_chat_conversation(self):
-        return """Assistant helps with both company-specific information and general knowledge questions. For company-related questions about healthcare plans and the employee handbook, use the provided sources and cite them using square brackets.
-        For general knowledge questions, you can answer directly using your built-in knowledge.
-        If the question is company-related, prioritize information from the sources below. If it's a general knowledge question, you can answer freely without need for sources.
+        return """Assistant helps the company employees with their healthcare plan questions, and questions about the employee handbook. Be brief in your answers.
+        Answer ONLY with the facts listed in the list of sources below. If there isn't enough information below, say you don't know. Do not generate answers that don't use the sources below. If asking a clarifying question to the user would help, ask the question.
         For tabular information return it as an html table. Do not return markdown format. If the question is not in English, answer in the language used in the question.
+        Each source has a name followed by colon and the actual information, always include the source name for each fact you use in the response. Use square brackets to reference the source, for example [info1.txt]. Don't combine sources, list each source separately, for example [info1.txt][info2.pdf].
         {follow_up_questions_prompt}
         {injected_prompt}
         """
@@ -96,9 +96,41 @@ class ChatReadRetrieveReadApproach(ChatApproach):
 
         original_user_query = history[-1]["content"]
 
+        
+        user_query_request = "Generate search query for: " + original_user_query
+
+        # STEP 2: Retrieve relevant documents from the search index with the GPT optimized query
+
+        # If retrieval mode includes vectors, compute an embedding for the query
+        vectors: list[VectorQuery] = []
+        if has_vector:
+            vectors.append(await self.compute_text_embedding(original_user_query))
+
+        # Only keep the text query if the retrieval mode uses text, otherwise drop it
+        if not has_text:
+            original_user_query = None   
+
+        results = await self.search(top, original_user_query, filter, vectors, use_semantic_ranker, use_semantic_captions)
+
+        sources_content = self.get_sources_content(results, use_semantic_captions, use_image_citation=False)
+        content = "\n".join(sources_content)
+
+
         # First try to get response from server
         try:
-            server_response = await self.server_client.execute_query(original_user_query)
+            # Prepare the data to send to the server
+            server_request = {
+                "prompt": original_user_query,
+                "conversation_history": history,
+                "system_prompt": self.get_system_prompt(
+                    overrides.get("prompt_template"),
+                    self.follow_up_questions_prompt_content if overrides.get("suggest_followup_questions") else "",
+                ),
+                "few_shots": self.query_prompt_few_shots if hasattr(self, "query_prompt_few_shots") else [],
+                "content": content
+            }
+            
+            server_response = await self.server_client.execute_query(server_request)
             if server_response and server_response.get("answer"):
                 return {
                     "data_points": {"text": []},
@@ -108,8 +140,6 @@ class ChatReadRetrieveReadApproach(ChatApproach):
                 }, self.create_server_response(server_response, should_stream)
         except Exception as e:
             print(f"Server request failed, falling back to default approach: {str(e)}")
-
-        user_query_request = "Generate search query for: " + original_user_query
 
         tools: List[ChatCompletionToolParam] = [
             {
@@ -169,6 +199,8 @@ class ChatReadRetrieveReadApproach(ChatApproach):
 
         sources_content = self.get_sources_content(results, use_semantic_captions, use_image_citation=False)
         content = "\n".join(sources_content)
+
+ 
 
         # STEP 3: Generate a contextual and content specific answer using the search results and chat history
 
