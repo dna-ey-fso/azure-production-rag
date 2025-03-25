@@ -8,7 +8,7 @@ class ServerClient:
     async def execute_query(self, server_request: Dict[str, Any]) -> Dict[str, Any]:
         async with aiohttp.ClientSession() as session:
             cascade_result = await self._execute(session, server_request, "execute_cascade")
-            #gpt4o_result = await self._execute(session, prompt, "execute_gpt4o")
+            #gpt4o_result = await self._execute(session, server_request, "execute_gpt4o")
             cascade_total_cost = cascade_result["total_cost"] 
             #gpt4o_total_cost = gpt4o_result["total_cost"]
 
