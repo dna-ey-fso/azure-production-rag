@@ -11,6 +11,7 @@ class ServerClient:
             #gpt4o_result = await self._execute(session, server_request, "execute_gpt4o")
             cascade_total_cost = cascade_result["total_cost"] 
             #gpt4o_total_cost = gpt4o_result["total_cost"]
+            #comparison = await self._execute(session, server_request, "compare_costs")
 
             # Print the costs to the terminal
             print(f"Cascade total cost: {cascade_total_cost}")
