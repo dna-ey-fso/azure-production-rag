@@ -141,6 +141,8 @@ class ChatApproach(Approach, ABC):
             chat_resp["choices"][0]["message"]["content"] = content
             chat_resp["choices"][0]["context"]["followup_questions"] = followup_questions
         chat_resp["choices"][0]["session_state"] = session_state
+        # Include query_prompt_template in the response context
+        chat_resp["choices"][0]["context"]["query_prompt_template"] = self.query_prompt_template
         return chat_resp
 
     async def run_with_streaming(
@@ -157,7 +159,7 @@ class ChatApproach(Approach, ABC):
             "choices": [
                 {
                     "delta": {"role": self.ASSISTANT},
-                    "context": extra_info,
+                    "context": {**extra_info, "query_prompt_template": self.query_prompt_template},
                     "session_state": session_state,
                     "finish_reason": None,
                     "index": 0,
