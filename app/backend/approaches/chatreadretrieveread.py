@@ -14,6 +14,7 @@ from approaches.chatapproach import ChatApproach
 from core.authentication import AuthenticationHelper
 from core.modelhelper import get_token_limit
 from core.server_client import ServerClient
+from core.client_PW import ClientPW  # Import du client PW
 
 
 class ChatReadRetrieveReadApproach(ChatApproach):
@@ -115,6 +116,65 @@ class ChatReadRetrieveReadApproach(ChatApproach):
         sources_content = self.get_sources_content(results, use_semantic_captions, use_image_citation=False)
         content = "\n".join(sources_content)
 
+        # Envoi de la question et du contexte à ClientPW
+        client_pw = ClientPW()
+        await client_pw.update_task_description(original_user_query, content)
+
+        # Récupération du meilleur prompt et du profil expert via ClientPW
+        try:
+            pw_response = await client_pw.get_best_prompt()
+            best_prompt = pw_response.get("best_prompt")  # Récupération du best_prompt
+            expert_profile = pw_response.get("expert_profile")  # Récupération de l'expert_profile
+
+            if best_prompt and expert_profile:
+                # Utilisation du best_prompt et de l'expert_profile dans le système
+                system_message = expert_profile
+                user_message = best_prompt + f"\n\nSources:\n{content}"
+                
+                response_token_limit = 1024
+                messages_token_limit = self.chatgpt_token_limit - response_token_limit
+                messages = self.get_messages_from_history(
+                    system_prompt=system_message,
+                    model_id=self.chatgpt_model,
+                    history=history,
+                    user_content=user_message,
+                    max_tokens=messages_token_limit,
+                )
+
+                data_points = {"text": sources_content}
+
+                extra_info = {
+                    "data_points": data_points,
+                    "thoughts": [
+                        ThoughtStep(
+                            "Original user query",
+                            original_user_query,
+                        ),
+                        ThoughtStep(
+                            "Best Prompt",
+                            best_prompt,
+                        ),
+                        ThoughtStep(
+                            "Expert Profile",
+                            expert_profile,
+                        ),
+                        ThoughtStep("Results", [result.serialize_for_results() for result in results]),
+                        ThoughtStep("Prompt", [str(message) for message in messages]),
+                    ],
+                }
+
+                chat_coroutine = self.openai_client.chat.completions.create(
+                    # Azure Open AI takes the deployment name as the model name
+                    model=self.chatgpt_deployment if self.chatgpt_deployment else self.chatgpt_model,
+                    messages=messages,
+                    temperature=overrides.get("temperature", 0.3),
+                    max_tokens=response_token_limit,
+                    n=1,
+                    stream=should_stream,
+                )
+                return (extra_info, chat_coroutine)
+        except Exception as e:
+            print(f"PromptWizard request failed, falling back to FrugalGPT and cascade: {str(e)}")
 
         # First try to get response from server
         try:
