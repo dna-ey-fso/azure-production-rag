@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Stack, IconButton } from "@fluentui/react";
+import { Stack, IconButton, DefaultButton } from "@fluentui/react";
 import DOMPurify from "dompurify";
 import { v4 as uuidv4 } from "uuid";
 import { useMutation } from "react-query";
@@ -91,6 +91,8 @@ export const Answer = ({
         window.open(`mailto:${email}?subject=${encodeURIComponent("Question Follow-up") || ""}&body=${encodeURIComponent(emailTemplate) || ""}`);
     };
 
+    const customDetailQuestion = "Can you give me more details about it ?";
+
     return (
         <Stack className={`${styles.answerContainer} ${isSelected && styles.selected}`} verticalAlign="space-between">
             <Stack.Item>
@@ -166,6 +168,12 @@ export const Answer = ({
                         })}
                     </Stack>
                 </Stack.Item>
+            )}
+
+            {!isStreaming && (
+                <div className={styles.moreDetailsButtonContainer}>
+                    <DefaultButton text="More details" onClick={() => onFollowupQuestionClicked?.(customDetailQuestion)} />
+                </div>
             )}
 
             <Stack.Item>

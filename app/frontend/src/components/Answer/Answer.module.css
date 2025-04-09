@@ -189,3 +189,9 @@ sup {
 .feedbackContainer button:disabled {
     background: #f3f4f6;
 }
+
+.moreDetailsButtonContainer {
+    margin-top: 10px;
+    display: flex;
+    justify-content: flex-end;
+}
